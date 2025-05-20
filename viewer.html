@@ -1,0 +1,272 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-F">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CT Scan Viewer</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            color: #333;
+        }}
+        #viewer-container {{
+            background-color: #000; /* Black background like Radiopaedia */
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 95vw; /* Responsive width */
+        }}
+        #ct-image-wrapper {{
+            position: relative; /* For overlay */
+            width: 100%;
+            max-width: 800px; /* Max width of the image container */
+            max-height: 80vh; /* Max height of the image container */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* Optional: in case image is larger than wrapper */
+        }}
+        #ct-image {{
+            display: block;
+            max-width: 100%;
+            max-height: 80vh; /* Consistent with wrapper */
+            object-fit: contain; /* Ensures image fits without cropping, maintaining aspect ratio */
+            background-color: #000; /* Ensure no white flicker if image loading is slow */
+        }}
+        #frame-info-overlay {{
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            z-index: 10;
+        }}
+        .controls {{
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+        }}
+        .controls button {{
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 1em;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }}
+        .controls button:hover {{
+            background-color: #45a049;
+        }}
+        .controls button:disabled {{
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }}
+        #frame-slider {{
+            width: 250px;
+            margin: 0 10px;
+            accent-color: #4CAF50; /* Modern way to style slider thumb and track */
+        }}
+        #frame-info-text {{
+            min-width: 100px;
+            text-align: center;
+            font-size: 0.9em;
+            margin: 5px 10px;
+            color: #555; /* Slightly lighter text for info */
+        }}
+        .instructions {{
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            max-width: 800px;
+            text-align: left;
+            font-size: 0.9em;
+        }}
+        .instructions h3 {{
+            margin-top: 0;
+        }}
+        .instructions code {{
+            background-color: #e8e8e8;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }}
+        @media (max-width: 600px) {{
+            #frame-slider {{
+                width: 180px;
+            }}
+            .controls button {{
+                padding: 8px 12px;
+                font-size: 0.9em;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div id="viewer-container">
+        <div id="ct-image-wrapper">
+            <img id="ct-image" src="" alt="CT Frame">
+            <div id="frame-info-overlay">Frame: 1 / N</div>
+        </div>
+        <div class="controls">
+            <button id="prev-frame-btn">◀ Prev</button>
+            <input type="range" id="frame-slider" min="0" value="0">
+            <button id="next-frame-btn">Next ▶</button>
+            <div id="frame-info-text">Frame: 1 / N</div>
+        </div>
+    </div>
+
+    <div class="instructions" style="display:none;" id="host-instructions">
+        <h3>Static Hosting Instructions</h3>
+        <p>To share this viewer, you need to host the generated files:</p>
+        <ol>
+            <li>Download the <code>CT_Scan_Viewer_Output</code> folder from your Google Drive.
+                It contains this <code>viewer.html</code> file and a subfolder named <code>frames</code> with all the image frames.</li>
+            <li>Upload the <strong>entire content</strong> of the <code>CT_Scan_Viewer_Output</code> folder (i.e., <code>viewer.html</code> and the <code>frames</code> folder) to a static web hosting service. Some free and easy options:
+                <ul>
+                    <li><strong>Netlify Drop:</strong> <a href="https://app.netlify.com/drop" target="_blank">netlify.com/drop</a> - Just drag and drop the <code>CT_Scan_Viewer_Output</code> folder.</li>
+                    <li><strong>GitHub Pages:</strong> Create a new repository, upload the files, and enable GitHub Pages in settings.</li>
+                    <li><strong>Vercel / Cloudflare Pages / etc.:</strong> Similar drag-and-drop or Git-based deployment.</li>
+                </ul>
+            </li>
+            <li>The hosting service will provide you with a public URL to share.</li>
+        </ol>
+        <p><strong>Important:</strong> You must upload both <code>viewer.html</code> and the <code>frames</code> folder, maintaining their relative structure, for the viewer to work.</p>
+    </div>
+
+    <script>
+        const imageFiles = ["frame_00000.jpg", "frame_00001.jpg", "frame_00002.jpg", "frame_00003.jpg", "frame_00004.jpg", "frame_00005.jpg", "frame_00006.jpg", "frame_00007.jpg", "frame_00008.jpg", "frame_00009.jpg", "frame_00010.jpg", "frame_00011.jpg", "frame_00012.jpg", "frame_00013.jpg", "frame_00014.jpg", "frame_00015.jpg", "frame_00016.jpg", "frame_00017.jpg", "frame_00018.jpg", "frame_00019.jpg", "frame_00020.jpg", "frame_00021.jpg", "frame_00022.jpg", "frame_00023.jpg", "frame_00024.jpg", "frame_00025.jpg", "frame_00026.jpg", "frame_00027.jpg", "frame_00028.jpg", "frame_00029.jpg", "frame_00030.jpg", "frame_00031.jpg", "frame_00032.jpg", "frame_00033.jpg", "frame_00034.jpg", "frame_00035.jpg", "frame_00036.jpg", "frame_00037.jpg", "frame_00038.jpg", "frame_00039.jpg", "frame_00040.jpg", "frame_00041.jpg", "frame_00042.jpg", "frame_00043.jpg", "frame_00044.jpg", "frame_00045.jpg", "frame_00046.jpg", "frame_00047.jpg", "frame_00048.jpg", "frame_00049.jpg", "frame_00050.jpg", "frame_00051.jpg", "frame_00052.jpg", "frame_00053.jpg", "frame_00054.jpg", "frame_00055.jpg", "frame_00056.jpg", "frame_00057.jpg", "frame_00058.jpg", "frame_00059.jpg", "frame_00060.jpg", "frame_00061.jpg", "frame_00062.jpg", "frame_00063.jpg", "frame_00064.jpg", "frame_00065.jpg", "frame_00066.jpg", "frame_00067.jpg", "frame_00068.jpg", "frame_00069.jpg", "frame_00070.jpg", "frame_00071.jpg", "frame_00072.jpg", "frame_00073.jpg", "frame_00074.jpg", "frame_00075.jpg", "frame_00076.jpg", "frame_00077.jpg", "frame_00078.jpg", "frame_00079.jpg", "frame_00080.jpg", "frame_00081.jpg", "frame_00082.jpg", "frame_00083.jpg", "frame_00084.jpg", "frame_00085.jpg", "frame_00086.jpg", "frame_00087.jpg", "frame_00088.jpg", "frame_00089.jpg", "frame_00090.jpg", "frame_00091.jpg", "frame_00092.jpg", "frame_00093.jpg", "frame_00094.jpg", "frame_00095.jpg", "frame_00096.jpg", "frame_00097.jpg", "frame_00098.jpg", "frame_00099.jpg", "frame_00100.jpg", "frame_00101.jpg", "frame_00102.jpg", "frame_00103.jpg", "frame_00104.jpg", "frame_00105.jpg", "frame_00106.jpg", "frame_00107.jpg", "frame_00108.jpg", "frame_00109.jpg", "frame_00110.jpg", "frame_00111.jpg", "frame_00112.jpg", "frame_00113.jpg", "frame_00114.jpg", "frame_00115.jpg", "frame_00116.jpg", "frame_00117.jpg", "frame_00118.jpg", "frame_00119.jpg", "frame_00120.jpg", "frame_00121.jpg", "frame_00122.jpg", "frame_00123.jpg", "frame_00124.jpg", "frame_00125.jpg", "frame_00126.jpg", "frame_00127.jpg", "frame_00128.jpg", "frame_00129.jpg", "frame_00130.jpg", "frame_00131.jpg", "frame_00132.jpg", "frame_00133.jpg", "frame_00134.jpg", "frame_00135.jpg", "frame_00136.jpg", "frame_00137.jpg", "frame_00138.jpg", "frame_00139.jpg", "frame_00140.jpg", "frame_00141.jpg", "frame_00142.jpg", "frame_00143.jpg", "frame_00144.jpg", "frame_00145.jpg", "frame_00146.jpg", "frame_00147.jpg", "frame_00148.jpg", "frame_00149.jpg", "frame_00150.jpg", "frame_00151.jpg", "frame_00152.jpg", "frame_00153.jpg", "frame_00154.jpg", "frame_00155.jpg", "frame_00156.jpg", "frame_00157.jpg", "frame_00158.jpg", "frame_00159.jpg", "frame_00160.jpg", "frame_00161.jpg", "frame_00162.jpg", "frame_00163.jpg", "frame_00164.jpg", "frame_00165.jpg", "frame_00166.jpg", "frame_00167.jpg", "frame_00168.jpg", "frame_00169.jpg", "frame_00170.jpg", "frame_00171.jpg", "frame_00172.jpg", "frame_00173.jpg", "frame_00174.jpg", "frame_00175.jpg", "frame_00176.jpg", "frame_00177.jpg", "frame_00178.jpg", "frame_00179.jpg", "frame_00180.jpg", "frame_00181.jpg", "frame_00182.jpg", "frame_00183.jpg", "frame_00184.jpg", "frame_00185.jpg", "frame_00186.jpg", "frame_00187.jpg", "frame_00188.jpg", "frame_00189.jpg", "frame_00190.jpg", "frame_00191.jpg", "frame_00192.jpg", "frame_00193.jpg", "frame_00194.jpg", "frame_00195.jpg", "frame_00196.jpg", "frame_00197.jpg", "frame_00198.jpg", "frame_00199.jpg", "frame_00200.jpg", "frame_00201.jpg", "frame_00202.jpg", "frame_00203.jpg", "frame_00204.jpg", "frame_00205.jpg", "frame_00206.jpg", "frame_00207.jpg", "frame_00208.jpg", "frame_00209.jpg", "frame_00210.jpg", "frame_00211.jpg", "frame_00212.jpg", "frame_00213.jpg", "frame_00214.jpg", "frame_00215.jpg", "frame_00216.jpg", "frame_00217.jpg", "frame_00218.jpg", "frame_00219.jpg", "frame_00220.jpg", "frame_00221.jpg", "frame_00222.jpg", "frame_00223.jpg", "frame_00224.jpg", "frame_00225.jpg", "frame_00226.jpg", "frame_00227.jpg", "frame_00228.jpg", "frame_00229.jpg", "frame_00230.jpg", "frame_00231.jpg", "frame_00232.jpg", "frame_00233.jpg", "frame_00234.jpg", "frame_00235.jpg", "frame_00236.jpg", "frame_00237.jpg", "frame_00238.jpg", "frame_00239.jpg", "frame_00240.jpg", "frame_00241.jpg", "frame_00242.jpg", "frame_00243.jpg", "frame_00244.jpg", "frame_00245.jpg", "frame_00246.jpg", "frame_00247.jpg", "frame_00248.jpg", "frame_00249.jpg", "frame_00250.jpg", "frame_00251.jpg", "frame_00252.jpg", "frame_00253.jpg", "frame_00254.jpg", "frame_00255.jpg", "frame_00256.jpg", "frame_00257.jpg", "frame_00258.jpg", "frame_00259.jpg", "frame_00260.jpg", "frame_00261.jpg", "frame_00262.jpg", "frame_00263.jpg", "frame_00264.jpg", "frame_00265.jpg", "frame_00266.jpg", "frame_00267.jpg", "frame_00268.jpg", "frame_00269.jpg", "frame_00270.jpg", "frame_00271.jpg", "frame_00272.jpg", "frame_00273.jpg", "frame_00274.jpg", "frame_00275.jpg", "frame_00276.jpg", "frame_00277.jpg", "frame_00278.jpg", "frame_00279.jpg", "frame_00280.jpg", "frame_00281.jpg", "frame_00282.jpg", "frame_00283.jpg", "frame_00284.jpg", "frame_00285.jpg", "frame_00286.jpg", "frame_00287.jpg", "frame_00288.jpg", "frame_00289.jpg", "frame_00290.jpg", "frame_00291.jpg", "frame_00292.jpg", "frame_00293.jpg", "frame_00294.jpg", "frame_00295.jpg", "frame_00296.jpg", "frame_00297.jpg", "frame_00298.jpg", "frame_00299.jpg", "frame_00300.jpg", "frame_00301.jpg", "frame_00302.jpg", "frame_00303.jpg", "frame_00304.jpg", "frame_00305.jpg", "frame_00306.jpg", "frame_00307.jpg", "frame_00308.jpg", "frame_00309.jpg", "frame_00310.jpg", "frame_00311.jpg", "frame_00312.jpg", "frame_00313.jpg", "frame_00314.jpg", "frame_00315.jpg", "frame_00316.jpg", "frame_00317.jpg", "frame_00318.jpg", "frame_00319.jpg", "frame_00320.jpg", "frame_00321.jpg", "frame_00322.jpg", "frame_00323.jpg", "frame_00324.jpg", "frame_00325.jpg", "frame_00326.jpg", "frame_00327.jpg", "frame_00328.jpg", "frame_00329.jpg", "frame_00330.jpg", "frame_00331.jpg", "frame_00332.jpg", "frame_00333.jpg", "frame_00334.jpg", "frame_00335.jpg", "frame_00336.jpg", "frame_00337.jpg", "frame_00338.jpg", "frame_00339.jpg", "frame_00340.jpg", "frame_00341.jpg", "frame_00342.jpg", "frame_00343.jpg", "frame_00344.jpg", "frame_00345.jpg", "frame_00346.jpg", "frame_00347.jpg", "frame_00348.jpg", "frame_00349.jpg", "frame_00350.jpg", "frame_00351.jpg", "frame_00352.jpg", "frame_00353.jpg", "frame_00354.jpg", "frame_00355.jpg", "frame_00356.jpg", "frame_00357.jpg", "frame_00358.jpg", "frame_00359.jpg", "frame_00360.jpg", "frame_00361.jpg", "frame_00362.jpg", "frame_00363.jpg", "frame_00364.jpg", "frame_00365.jpg", "frame_00366.jpg", "frame_00367.jpg", "frame_00368.jpg", "frame_00369.jpg", "frame_00370.jpg", "frame_00371.jpg", "frame_00372.jpg", "frame_00373.jpg", "frame_00374.jpg", "frame_00375.jpg", "frame_00376.jpg", "frame_00377.jpg", "frame_00378.jpg", "frame_00379.jpg", "frame_00380.jpg", "frame_00381.jpg", "frame_00382.jpg", "frame_00383.jpg", "frame_00384.jpg", "frame_00385.jpg", "frame_00386.jpg", "frame_00387.jpg", "frame_00388.jpg", "frame_00389.jpg", "frame_00390.jpg", "frame_00391.jpg", "frame_00392.jpg", "frame_00393.jpg", "frame_00394.jpg", "frame_00395.jpg", "frame_00396.jpg", "frame_00397.jpg", "frame_00398.jpg", "frame_00399.jpg", "frame_00400.jpg", "frame_00401.jpg", "frame_00402.jpg", "frame_00403.jpg", "frame_00404.jpg", "frame_00405.jpg", "frame_00406.jpg", "frame_00407.jpg", "frame_00408.jpg", "frame_00409.jpg", "frame_00410.jpg", "frame_00411.jpg", "frame_00412.jpg", "frame_00413.jpg", "frame_00414.jpg", "frame_00415.jpg", "frame_00416.jpg", "frame_00417.jpg", "frame_00418.jpg", "frame_00419.jpg", "frame_00420.jpg", "frame_00421.jpg", "frame_00422.jpg", "frame_00423.jpg", "frame_00424.jpg", "frame_00425.jpg", "frame_00426.jpg", "frame_00427.jpg", "frame_00428.jpg", "frame_00429.jpg", "frame_00430.jpg", "frame_00431.jpg", "frame_00432.jpg", "frame_00433.jpg", "frame_00434.jpg", "frame_00435.jpg", "frame_00436.jpg", "frame_00437.jpg", "frame_00438.jpg", "frame_00439.jpg", "frame_00440.jpg", "frame_00441.jpg", "frame_00442.jpg", "frame_00443.jpg", "frame_00444.jpg", "frame_00445.jpg", "frame_00446.jpg", "frame_00447.jpg", "frame_00448.jpg", "frame_00449.jpg", "frame_00450.jpg", "frame_00451.jpg", "frame_00452.jpg", "frame_00453.jpg", "frame_00454.jpg", "frame_00455.jpg", "frame_00456.jpg", "frame_00457.jpg", "frame_00458.jpg", "frame_00459.jpg", "frame_00460.jpg", "frame_00461.jpg", "frame_00462.jpg", "frame_00463.jpg", "frame_00464.jpg", "frame_00465.jpg", "frame_00466.jpg", "frame_00467.jpg", "frame_00468.jpg", "frame_00469.jpg", "frame_00470.jpg", "frame_00471.jpg", "frame_00472.jpg", "frame_00473.jpg", "frame_00474.jpg", "frame_00475.jpg", "frame_00476.jpg", "frame_00477.jpg", "frame_00478.jpg", "frame_00479.jpg", "frame_00480.jpg", "frame_00481.jpg", "frame_00482.jpg", "frame_00483.jpg", "frame_00484.jpg", "frame_00485.jpg", "frame_00486.jpg", "frame_00487.jpg", "frame_00488.jpg", "frame_00489.jpg", "frame_00490.jpg", "frame_00491.jpg", "frame_00492.jpg", "frame_00493.jpg", "frame_00494.jpg", "frame_00495.jpg", "frame_00496.jpg", "frame_00497.jpg", "frame_00498.jpg", "frame_00499.jpg", "frame_00500.jpg", "frame_00501.jpg", "frame_00502.jpg", "frame_00503.jpg", "frame_00504.jpg", "frame_00505.jpg", "frame_00506.jpg", "frame_00507.jpg", "frame_00508.jpg", "frame_00509.jpg", "frame_00510.jpg", "frame_00511.jpg", "frame_00512.jpg", "frame_00513.jpg", "frame_00514.jpg", "frame_00515.jpg", "frame_00516.jpg", "frame_00517.jpg", "frame_00518.jpg", "frame_00519.jpg", "frame_00520.jpg", "frame_00521.jpg", "frame_00522.jpg", "frame_00523.jpg", "frame_00524.jpg", "frame_00525.jpg", "frame_00526.jpg", "frame_00527.jpg", "frame_00528.jpg", "frame_00529.jpg", "frame_00530.jpg", "frame_00531.jpg", "frame_00532.jpg", "frame_00533.jpg", "frame_00534.jpg", "frame_00535.jpg", "frame_00536.jpg", "frame_00537.jpg", "frame_00538.jpg", "frame_00539.jpg", "frame_00540.jpg", "frame_00541.jpg", "frame_00542.jpg", "frame_00543.jpg", "frame_00544.jpg", "frame_00545.jpg", "frame_00546.jpg", "frame_00547.jpg", "frame_00548.jpg", "frame_00549.jpg", "frame_00550.jpg", "frame_00551.jpg", "frame_00552.jpg", "frame_00553.jpg", "frame_00554.jpg", "frame_00555.jpg", "frame_00556.jpg", "frame_00557.jpg", "frame_00558.jpg", "frame_00559.jpg", "frame_00560.jpg", "frame_00561.jpg", "frame_00562.jpg", "frame_00563.jpg", "frame_00564.jpg", "frame_00565.jpg", "frame_00566.jpg", "frame_00567.jpg", "frame_00568.jpg", "frame_00569.jpg", "frame_00570.jpg", "frame_00571.jpg", "frame_00572.jpg", "frame_00573.jpg", "frame_00574.jpg", "frame_00575.jpg", "frame_00576.jpg", "frame_00577.jpg", "frame_00578.jpg", "frame_00579.jpg", "frame_00580.jpg", "frame_00581.jpg", "frame_00582.jpg", "frame_00583.jpg", "frame_00584.jpg", "frame_00585.jpg", "frame_00586.jpg", "frame_00587.jpg", "frame_00588.jpg", "frame_00589.jpg", "frame_00590.jpg", "frame_00591.jpg", "frame_00592.jpg", "frame_00593.jpg", "frame_00594.jpg", "frame_00595.jpg", "frame_00596.jpg", "frame_00597.jpg", "frame_00598.jpg", "frame_00599.jpg", "frame_00600.jpg", "frame_00601.jpg", "frame_00602.jpg", "frame_00603.jpg", "frame_00604.jpg", "frame_00605.jpg", "frame_00606.jpg", "frame_00607.jpg", "frame_00608.jpg", "frame_00609.jpg", "frame_00610.jpg", "frame_00611.jpg", "frame_00612.jpg", "frame_00613.jpg", "frame_00614.jpg", "frame_00615.jpg", "frame_00616.jpg", "frame_00617.jpg", "frame_00618.jpg", "frame_00619.jpg", "frame_00620.jpg", "frame_00621.jpg", "frame_00622.jpg", "frame_00623.jpg", "frame_00624.jpg", "frame_00625.jpg", "frame_00626.jpg", "frame_00627.jpg", "frame_00628.jpg", "frame_00629.jpg", "frame_00630.jpg", "frame_00631.jpg", "frame_00632.jpg", "frame_00633.jpg", "frame_00634.jpg", "frame_00635.jpg", "frame_00636.jpg", "frame_00637.jpg", "frame_00638.jpg", "frame_00639.jpg", "frame_00640.jpg", "frame_00641.jpg", "frame_00642.jpg", "frame_00643.jpg", "frame_00644.jpg", "frame_00645.jpg", "frame_00646.jpg", "frame_00647.jpg", "frame_00648.jpg", "frame_00649.jpg", "frame_00650.jpg", "frame_00651.jpg", "frame_00652.jpg", "frame_00653.jpg", "frame_00654.jpg", "frame_00655.jpg", "frame_00656.jpg", "frame_00657.jpg", "frame_00658.jpg", "frame_00659.jpg", "frame_00660.jpg", "frame_00661.jpg", "frame_00662.jpg", "frame_00663.jpg", "frame_00664.jpg", "frame_00665.jpg", "frame_00666.jpg", "frame_00667.jpg", "frame_00668.jpg", "frame_00669.jpg", "frame_00670.jpg", "frame_00671.jpg", "frame_00672.jpg", "frame_00673.jpg", "frame_00674.jpg", "frame_00675.jpg", "frame_00676.jpg", "frame_00677.jpg", "frame_00678.jpg", "frame_00679.jpg", "frame_00680.jpg", "frame_00681.jpg", "frame_00682.jpg", "frame_00683.jpg", "frame_00684.jpg", "frame_00685.jpg", "frame_00686.jpg", "frame_00687.jpg", "frame_00688.jpg", "frame_00689.jpg", "frame_00690.jpg", "frame_00691.jpg", "frame_00692.jpg", "frame_00693.jpg", "frame_00694.jpg", "frame_00695.jpg", "frame_00696.jpg", "frame_00697.jpg", "frame_00698.jpg", "frame_00699.jpg", "frame_00700.jpg", "frame_00701.jpg", "frame_00702.jpg", "frame_00703.jpg", "frame_00704.jpg", "frame_00705.jpg", "frame_00706.jpg"]; // Populated by Python
+        const framesDir = "frames"; // Subdirectory for frames
+
+        const ctImage = document.getElementById('ct-image');
+        const frameSlider = document.getElementById('frame-slider');
+        const frameInfoText = document.getElementById('frame-info-text');
+        const frameInfoOverlay = document.getElementById('frame-info-overlay');
+        const prevFrameBtn = document.getElementById('prev-frame-btn');
+        const nextFrameBtn = document.getElementById('next-frame-btn');
+        const imageWrapper = document.getElementById('ct-image-wrapper');
+        const hostInstructions = document.getElementById('host-instructions');
+
+        let currentFrame = 0;
+        const totalFrames = imageFiles.length;
+
+        function updateFrame(index) {{
+            if (index < 0 || index >= totalFrames) {{
+                return;
+            }}
+            currentFrame = index;
+            ctImage.src = `${framesDir}/${imageFiles[currentFrame]}`;
+            frameSlider.value = currentFrame;
+            const displayFrameNum = currentFrame + 1;
+            const info = `Frame: ${displayFrameNum} / ${totalFrames}`;
+            frameInfoText.textContent = info;
+            frameInfoOverlay.textContent = info;
+
+            prevFrameBtn.disabled = currentFrame === 0;
+            nextFrameBtn.disabled = currentFrame === totalFrames - 1;
+        }}
+
+        function setupViewer() {{
+            if (totalFrames === 0) {{
+                ctImage.alt = "No frames to display.";
+                frameInfoText.textContent = "No frames.";
+                frameInfoOverlay.textContent = "No frames.";
+                frameSlider.disabled = true;
+                prevFrameBtn.disabled = true;
+                nextFrameBtn.disabled = true;
+                return;
+            }}
+
+            frameSlider.max = totalFrames - 1;
+            updateFrame(0);
+
+            frameSlider.addEventListener('input', (event) => {{
+                updateFrame(parseInt(event.target.value));
+            }});
+
+            prevFrameBtn.addEventListener('click', () => {{
+                updateFrame(currentFrame - 1);
+            }});
+
+            nextFrameBtn.addEventListener('click', () => {{
+                updateFrame(currentFrame + 1);
+            }});
+
+            // Mouse wheel scroll functionality
+            imageWrapper.addEventListener('wheel', (event) => {{
+                event.preventDefault(); // Prevent page scroll
+                if (event.deltaY < 0) {{ // Scroll up
+                    updateFrame(currentFrame - 1);
+                }} else {{ // Scroll down
+                    updateFrame(currentFrame + 1);
+                }}
+            }}, {{ passive: false }}); // passive: false to allow preventDefault
+
+            // Touch drag functionality (basic swipe)
+            let touchStartX = 0;
+            let touchMoveX = 0;
+            const swipeThreshold = 30; // pixels
+
+            imageWrapper.addEventListener('touchstart', (event) => {{
+                if (event.touches.length === 1) {{ // Single touch
+                    touchStartX = event.touches[0].clientX;
+                }}
+            }}, {{ passive: true }});
+
+            imageWrapper.addEventListener('touchmove', (event) => {{
+                if (event.touches.length === 1) {{ // Single touch
+                     touchMoveX = event.touches[0].clientX;
+                }}
+            }}, {{ passive: true }});
+
+            imageWrapper.addEventListener('touchend', () => {{
+                if (touchStartX === 0) return; // No touch start registered
+                const diffX = touchMoveX - touchStartX;
+                if (Math.abs(diffX) > swipeThreshold) {{
+                    if (diffX > 0) {{ // Swipe right (previous image)
+                        updateFrame(currentFrame - 1);
+                    }} else {{ // Swipe left (next image)
+                        updateFrame(currentFrame + 1);
+                    }}
+                }}
+                // Reset for next touch
+                touchStartX = 0;
+                touchMoveX = 0;
+            }});
+
+            // If this HTML is viewed locally (file://) or not from expected hosts, show instructions
+            if (window.location.protocol === 'file:' || !['localhost', '127.0.0.1'].includes(window.location.hostname) && !window.location.hostname.endsWith('netlify.app') && !window.location.hostname.endsWith('github.io')) {{
+                 // A bit of a heuristic, you might want to adjust this check
+                 // Or, if you plan to embed this, you might remove this 'host-instructions' display logic
+                if(hostInstructions) hostInstructions.style.display = 'block';
+            }}
+        }}
+
+        // Initialize
+        setupViewer();
+    </script>
+</body>
+</html>
